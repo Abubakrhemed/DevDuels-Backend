@@ -1,19 +1,24 @@
 import express from "express"
 import User from "../Models/User.js"
 import bcrypt from "bcrypt"
+import jsonwebtoken from "jsonwebtoken"
+import { requireAuth, AuthedRequest } from "../middleware/auth.js"
+import { JWT_SECRET, } from "../config/env.js"
 
 const AuthRouter = express.Router()
 
-AuthRouter.get("/user:id", async (req, res) => {
+AuthRouter.get("/user/:id", requireAuth, async (req: AuthedRequest, res) => {
     try {
         const id = req.params.id
         const response = await User.findById(id)
+
         if (!response) {
-            res.status(400).json({ err: "no user found " })
+            res.status(404).json({ err: "no user found" })
             return
         }
 
-        res.status(200).json({ response })
+        const { passwordHash: _, ...safeUser } = response.toObject()
+        res.status(200).json({ user: safeUser })
     } catch (err) {
         res.status(500).json({ err: "server err occured" })
         console.log(err)
@@ -39,7 +44,7 @@ AuthRouter.post("/user/login", async (req, res) => {
             return
         }
 
-        const user = await User.findOne({username})
+        const user = await User.findOne({ username }).select('+passwordHash')
 
         if (!user) {
             res.status(400).json({ err: "username or password is incorrect" })
@@ -58,7 +63,13 @@ AuthRouter.post("/user/login", async (req, res) => {
             return
         }
 
-        res.status(200).json({ user })
+        const token = jsonwebtoken.sign(
+            { id: user._id },JWT_SECRET,
+            { expiresIn: "1d" }
+        )
+
+        const { passwordHash: _, ...safeUser } = user.toObject()
+        res.status(200).json({ user: safeUser, token })
 
     } catch (err) {
         res.status(500).json({ err: "server err occured failed to login try again later" })
@@ -85,6 +96,13 @@ AuthRouter.post("/user/register", async (req, res) => {
             return
         }
 
+        const exists = await User.findOne({ username })
+
+        if (exists) {
+            res.status(400).json({ err: "username is taken"})
+            return
+        }
+
         const passwordHash = await bcrypt.hash(password, 12)
 
         const user = new User({
@@ -94,7 +112,8 @@ AuthRouter.post("/user/register", async (req, res) => {
 
         await user.save()
 
-        res.status(201).json({ user })
+        const { passwordHash: _, ...safeUser } = user.toObject()
+        res.status(201).json({ user: safeUser })
 
     } catch (err) {
         res.status(500).json({ err: "server err occured failed to register try again later" })
