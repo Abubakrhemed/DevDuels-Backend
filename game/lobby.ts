@@ -1,0 +1,112 @@
+import { Server, Socket } from "socket.io"
+import { randomUUID } from "node:crypto"
+import { Lobby, Player } from "../types/types.js"
+import User from "../Models/User.js"
+
+const lobbies = new Map<string, Lobby>()
+const max_players = 4
+const min_players = 1
+
+export function registerLobbyHandlers(socket: Socket, io: Server) {
+    socket.on('lobby:create', async (playerid, callback) => {
+        const roomId = randomUUID()
+        const players = new Map()
+
+        const user = await User.findById(playerid).select("-passwordHash")
+
+        if (!user) {
+            console.log("finding user failed", user)
+            return
+        }
+
+        const player: Player = {
+            userId: playerid,
+            username: user?.username,
+            score: 0,
+            lives: 3
+        }
+
+        players.set(playerid, player)
+
+        const lobby: Lobby = {
+            roomId: roomId,
+            players: players,
+            privacy: "PRIVATE",
+            maxPlayers:max_players,
+            minPlayers:min_players
+        }
+
+        lobbies.set(roomId, lobby)
+
+        socket.join(roomId)
+
+        callback({ status: "ok", roomId, lobby })
+    })
+}
+
+export function joinLobbyHandlers(socket: Socket, io: Server) {
+    socket.on('lobby:join', async (roomId, playerid, callback) => {
+        const lobby = lobbies.get(roomId)
+
+        if (!lobby) {
+            callback({ status: "error", message: "lobby not found" })
+            return
+        }
+
+        if (lobby.players.size >= max_players) {
+            callback({ status: "error", message: "lobby is full" })
+            return
+        }
+
+        const user = await User.findById(playerid).select("-passwordHash")
+
+        if (!user) {
+            callback({ status: "error", message: "user not found" })
+            return
+        }
+
+        const player: Player = {
+            userId: playerid,
+            username: user.username,
+            score: 0,
+            lives: 3,
+        }
+
+        lobby.players.set(playerid, player)
+
+        socket.join(roomId)
+
+        io.to(roomId).emit('lobby:playerJoined', { player })
+
+        callback({ status: "ok", lobby })
+    })
+}
+
+
+export function lobbyDisconnectHandler(socket: Socket, io: Server) {
+    socket.on('lobby:dissconnect', async (roomID,playerid,callback) => {
+        const lobby = lobbies.get(roomID)
+
+        const user = await User.findById(playerid).select("-passwordHash")
+
+        if (!user) {
+            callback({ status: "error", message: "user not found" })
+            return
+        }
+
+        if (!lobby) {
+            io.to(socket.id).emit("lobby does not exist")
+            return
+        }
+
+        lobby.players.delete(playerid)
+
+        if (lobby.players.size < min_players) {
+            io.to(roomID).emit("lobby has been discarded")
+            lobbies.delete(roomID)
+            return
+        }
+
+        io.to(roomID).emit('lobby:playerLeft', { username: user.username })
+    })
+}

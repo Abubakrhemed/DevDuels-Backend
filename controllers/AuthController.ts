@@ -64,7 +64,7 @@ AuthRouter.post("/user/login", async (req, res) => {
         }
 
         const token = jsonwebtoken.sign(
-            { id: user._id },JWT_SECRET,
+            { id: user._id }, JWT_SECRET,
             { expiresIn: "1d" }
         )
 
@@ -99,7 +99,7 @@ AuthRouter.post("/user/register", async (req, res) => {
         const exists = await User.findOne({ username })
 
         if (exists) {
-            res.status(400).json({ err: "username is taken"})
+            res.status(400).json({ err: "username is taken" })
             return
         }
 
