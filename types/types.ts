@@ -17,4 +17,16 @@ export type Lobby = {
     minPlayers:number
 }
 
+export type QuestionSeed = {
+    question: string,
+    format: Format,
+    options: string[],
+    correctAnswer: string,
+    pointsAwarded: number,
+    pointsSubtracted: number,
+    timeAwarded: number,
+    timeSubtracted: number,
+    livesSubtracted: number,
+}
+
 export type Format = "MCQ" | "CodeSnippet" | "TrueFalse"
