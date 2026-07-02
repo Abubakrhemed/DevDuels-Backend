@@ -29,4 +29,20 @@ export type QuestionSeed = {
     livesSubtracted: number,
 }
 
+export type GameState = {
+    roomId: string,
+    questions: QuestionSeed[],      
+    playerProgress: Map<string, {  
+        currentIndex: number,
+        score: number,
+        lives: number,
+    }>
+}
+
+export type PlayerProgress = {
+    currentIndex: number,
+    score: number,
+    lives: number,
+}
+
 export type Format = "MCQ" | "CodeSnippet" | "TrueFalse"

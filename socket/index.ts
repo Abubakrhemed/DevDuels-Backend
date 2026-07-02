@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io"
 import { Server as HttpServer } from "node:http"
 import { joinLobbyHandlers, lobbyDisconnectHandler, registerLobbyHandlers } from "../game/lobby.js"
+import provideQuestions from "../game/game.js"
 
 export function initSocket(server: HttpServer) {
     const io = new Server(server, {
@@ -12,6 +13,7 @@ export function initSocket(server: HttpServer) {
         registerLobbyHandlers(socket,io)
         joinLobbyHandlers(socket,io)
         lobbyDisconnectHandler(socket,io)
+        provideQuestions(socket,io)
 
         socket.on('disconnect', () => {
             console.log('user disconnected');
