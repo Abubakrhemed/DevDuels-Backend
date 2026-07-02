@@ -16,3 +16,5 @@ export type Lobby = {
     maxPlayers:number,
     minPlayers:number
 }
+
+export type Format = "MCQ" | "CodeSnippet" | "TrueFalse"
