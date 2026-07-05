@@ -8,7 +8,7 @@ const games = new Map<string, GameState>();
 export default function provideQuestions(socket: Socket, io: Server) {
   socket.on("game:start", async (roomId, playerid, callback) => {
     try {
-      const user = await User.findById(playerid);
+      const user = await findUser(playerid);
 
       if (!user) {
         socket.emit("game:error", "couldn't find your account");
