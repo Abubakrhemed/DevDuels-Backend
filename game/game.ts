@@ -1,7 +1,6 @@
 import { Server, Socket } from "socket.io";
-import User from "../Models/User.js";
 import { getQuestions, findUser } from "./helpers/helpers.js";
-import { GameState, QuestionSeed } from "../types/types.js";
+import { GameState, PlayerProgress, QuestionSeed } from "../types/types.js";
 
 const games = new Map<string, GameState>();
 
@@ -30,9 +29,21 @@ export default function provideQuestions(socket: Socket, io: Server) {
         currentIndex: 0,
         score: 0,
         lives: 3,
+        time: 30000,
+        timeoutId: null,
       });
 
       const progress = game.playerProgress.get(playerid)!;
+
+      const timeoutId = setTimeout(() => {
+        socket.emit("game:over", {
+          score: progress.score,
+          reason: "no time remaining",
+        });
+      }, 30000);
+
+      progress.timeoutId = timeoutId;
+
       const fullQuestion = game.questions[progress.currentIndex]!;
       const { correctAnswer, ...safeQuestion } = fullQuestion;
 
@@ -43,6 +54,13 @@ export default function provideQuestions(socket: Socket, io: Server) {
     }
   });
 }
+
+const clearPlayerTimeout = (state: PlayerProgress) => {
+  if (state.timeoutId) {
+    clearTimeout(state.timeoutId);
+    state.timeoutId = null;
+  }
+};
 
 export function confirmAnswer(socket: Socket, io: Server) {
   socket.on(
@@ -84,12 +102,15 @@ export function confirmAnswer(socket: Socket, io: Server) {
         const answerCheck = checkAnswer(answer, roomId, playerid);
         const pointsChange = calculatePoints(answerCheck, currentQuestion);
         const livesChange = calculateLives(answerCheck, currentQuestion);
+        const timeChange = calculateTime(answerCheck, currentQuestion);
 
         currentState.score += pointsChange;
         currentState.lives += livesChange;
         currentState.currentIndex += 1;
+        currentState.time += timeChange;
 
         if (currentState.lives <= 0) {
+          clearPlayerTimeout(currentState);
           socket.emit("game:over", {
             score: currentState.score,
             reason: "no lives remaining",
@@ -97,9 +118,19 @@ export function confirmAnswer(socket: Socket, io: Server) {
           return;
         }
 
+        if (currentState.time <= 0) {
+          clearPlayerTimeout(currentState);
+          socket.emit("game:over", {
+            score: currentState.score,
+            reason: "no time remaining",
+          });
+          return;
+        }
+
         const nextQuestion = game.questions[currentState.currentIndex];
 
         if (!nextQuestion) {
+          clearPlayerTimeout(currentState);
           socket.emit("game:over", {
             score: currentState.score,
             reason: "all questions answered",
@@ -113,6 +144,7 @@ export function confirmAnswer(socket: Socket, io: Server) {
           score: currentState.score,
           lives: currentState.lives,
           currentIndex: currentState.currentIndex,
+          time: currentState.time,
         });
       } catch (err) {
         console.log(err);
@@ -151,4 +183,14 @@ const calculateLives = (
     return 0;
   }
   return -currentQuestion.livesSubtracted;
+};
+
+const calculateTime = (
+  object: { answeredCorrect: boolean },
+  currentQuestion: QuestionSeed,
+): number => {
+  if (object.answeredCorrect) {
+    return currentQuestion.timeAwarded;
+  }
+  return -currentQuestion.timeSubtracted;
 };
