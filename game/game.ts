@@ -4,7 +4,7 @@ import { GameState, PlayerProgress, QuestionSeed } from "../types/types.js";
 
 const games = new Map<string, GameState>();
 
-export default function provideQuestions(socket: Socket, io: Server) {
+export function provideQuestions(socket: Socket, io: Server) {
   socket.on("game:start", async (roomId, playerid, callback) => {
     try {
       const user = await findUser(playerid);
