@@ -1,10 +1,15 @@
 import { Server, Socket } from "socket.io";
-import { getQuestions, findUser, updateLeaderboardScores } from "./helpers/helpers.js";
+import {
+  getQuestions,
+  findUser,
+  updateLeaderboardScores,
+} from "./helpers/helpers.js";
 import { GameState, PlayerProgress, QuestionSeed } from "../types/types.js";
+import { setLobbyInProgress } from "./lobby.js";
 
 const games = new Map<string, GameState>();
 
-export function provideQuestions(socket: Socket, io: Server) {
+export function startGame(socket: Socket, io: Server) {
   socket.on("game:start", async (roomId, playerid, callback) => {
     try {
       const user = await findUser(playerid);
@@ -14,14 +19,17 @@ export function provideQuestions(socket: Socket, io: Server) {
         return;
       }
 
-      if (!games.has(roomId)) {
-        const questions = await getQuestions();
-        games.set(roomId, {
-          roomId,
-          questions,
-          playerProgress: new Map(),
-        });
+      if (games.has(roomId)) {
+        callback({ status: "error", message: "game already in progress" });
+        return;
       }
+
+      const questions = await getQuestions();
+      games.set(roomId, {
+        roomId,
+        questions,
+        playerProgress: new Map(),
+      });
 
       const game = games.get(roomId)!;
 
@@ -32,6 +40,8 @@ export function provideQuestions(socket: Socket, io: Server) {
         time: 30000,
         timeoutId: null,
       });
+
+      setLobbyInProgress(roomId, true);
 
       const progress = game.playerProgress.get(playerid)!;
 
@@ -82,20 +92,21 @@ const checkAllPlayersFinished = (game: GameState): boolean => {
 };
 
 const handleGameEnd = async (io: Server, roomId: string, game: GameState) => {
-    const result = checkWinner(game.playerProgress)
-    io.to(roomId).emit("game:end", result)
+  const result = checkWinner(game.playerProgress);
+  io.to(roomId).emit("game:end", result);
 
-    try {
-        await updateLeaderboardScores(game.playerProgress)
-    } catch (err) {
-        console.error("failed to update leaderboard scores:", err)
-    }
+  try {
+    await updateLeaderboardScores(game.playerProgress);
+  } catch (err) {
+    console.error("failed to update leaderboard scores:", err);
+  }
 
-    setTimeout(() => {
-        io.to(roomId).emit("game:returnToLobby")
-        games.delete(roomId)
-    }, 10000)
-}
+  setTimeout(() => {
+    io.to(roomId).emit("game:returnToLobby");
+    setLobbyInProgress(roomId, false);
+    games.delete(roomId);
+  }, 10000);
+};
 
 const checkWinner = (playerProgress: Map<string, PlayerProgress>) => {
   const entries = Array.from(playerProgress.entries());

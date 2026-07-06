@@ -7,7 +7,7 @@ import {
   lobbyPrivacyHandler,
 } from "../game/lobby.js";
 
-import { confirmAnswer, provideQuestions } from "../game/game.js";
+import { confirmAnswer, startGame } from "../game/game.js";
 
 export function initSocket(server: HttpServer) {
   const io = new Server(server, {
@@ -18,7 +18,7 @@ export function initSocket(server: HttpServer) {
     registerLobbyHandlers(socket, io);
     joinLobbyHandlers(socket, io);
     lobbyDisconnectHandler(socket, io);
-    provideQuestions(socket, io);
+    startGame(socket, io);
     confirmAnswer(socket, io);
     lobbyPrivacyHandler(socket, io);
 

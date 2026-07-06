@@ -37,6 +37,7 @@ export function registerLobbyHandlers(socket: Socket, io: Server) {
       maxPlayers: max_players,
       minPlayers: min_players,
       password: password,
+      inProgress: false,
     };
 
     lobbies.set(roomId, lobby);
@@ -58,6 +59,14 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
 
     if (lobby.players.size >= max_players) {
       callback({ status: "error", message: "lobby is full" });
+      return;
+    }
+
+    if (lobby.inProgress) {
+      callback({
+        status: "error",
+        message: "game already in progress, wait for it to finish",
+      });
       return;
     }
 
@@ -167,3 +176,10 @@ export function lobbyDisconnectHandler(socket: Socket, io: Server) {
     io.to(roomID).emit("lobby:playerLeft", { username: user.username });
   });
 }
+
+export const setLobbyInProgress = (roomId: string, state: boolean) => {
+  const lobby = lobbies.get(roomId);
+  if (lobby) {
+    lobby.inProgress = state;
+  }
+};

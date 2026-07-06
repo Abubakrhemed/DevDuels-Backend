@@ -5,7 +5,7 @@ const userSchema = new Schema({
      passwordHash: { type: String, required: true, select: false },
      Points: { type: Number, default: 0 },
      status: { type: String, enum: ["OFFLINE", "IN_LOBBY", "IN_GAME", "ONLINE"], default: "OFFLINE" },
-     leaderbaordPts: { type: Number, default: 0 },
+     leaderboardPts: { type: Number, default: 0 },
 })
 
 const User = mongoose.model('User', userSchema);

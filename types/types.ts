@@ -16,6 +16,7 @@ export type Lobby = {
   maxPlayers: number;
   minPlayers: number;
   password:string | undefined;
+  inProgress: boolean
 };
 
 export type QuestionSeed = {
