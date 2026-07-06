@@ -11,14 +11,10 @@ try {
     const response = await mongoose.connect(MONGODB_URI, { family: 4 })
 
     if (response) {
-
         initSocket(server)
-        
         server.listen(PORT, () => {
             console.log("server running on ", PORT);
         });
-
-    
     }
 
 } catch (err: any) {

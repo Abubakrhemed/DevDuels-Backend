@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { getQuestions, findUser } from "./helpers/helpers.js";
+import { getQuestions, findUser, updateLeaderboardScores } from "./helpers/helpers.js";
 import { GameState, PlayerProgress, QuestionSeed } from "../types/types.js";
 
 const games = new Map<string, GameState>();
@@ -81,15 +81,21 @@ const checkAllPlayersFinished = (game: GameState): boolean => {
   return true;
 };
 
-const handleGameEnd = (io: Server, roomId: string, game: GameState) => {
-  const result = checkWinner(game.playerProgress);
-  io.to(roomId).emit("game:end", result);
+const handleGameEnd = async (io: Server, roomId: string, game: GameState) => {
+    const result = checkWinner(game.playerProgress)
+    io.to(roomId).emit("game:end", result)
 
-  setTimeout(() => {
-    io.to(roomId).emit("game:returnToLobby");
-    games.delete(roomId);
-  }, 10000);
-};
+    try {
+        await updateLeaderboardScores(game.playerProgress)
+    } catch (err) {
+        console.error("failed to update leaderboard scores:", err)
+    }
+
+    setTimeout(() => {
+        io.to(roomId).emit("game:returnToLobby")
+        games.delete(roomId)
+    }, 10000)
+}
 
 const checkWinner = (playerProgress: Map<string, PlayerProgress>) => {
   const entries = Array.from(playerProgress.entries());

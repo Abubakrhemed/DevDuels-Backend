@@ -1,5 +1,5 @@
 import Question from "../../Models/Question.js";
-import { QuestionSeed } from "../../types/types.js";
+import { PlayerProgress, QuestionSeed } from "../../types/types.js";
 import User from "../../Models/User.js";
 
 const randomizeQuestions = (questions: Array<QuestionSeed>) => {
@@ -35,3 +35,15 @@ export const findUser = async (playerid: string) => {
   }
 };
 
+export const updateLeaderboardScores = async (
+    playerProgress: Map<string, PlayerProgress>
+) => {
+    const updates = Array.from(playerProgress.entries()).map(([userId, progress]) => {
+        return User.findByIdAndUpdate(
+            userId,
+            { $inc: { leaderboardPts: progress.score } }
+        )
+    })
+
+    await Promise.all(updates)
+}
