@@ -40,6 +40,12 @@ export function provideQuestions(socket: Socket, io: Server) {
           score: progress.score,
           reason: "no time remaining",
         });
+
+        progress.time = 0;
+
+        if (checkAllPlayersFinished(game)) {
+          handleGameEnd(io, roomId, game);
+        }
       }, 30000);
 
       progress.timeoutId = timeoutId;
@@ -60,6 +66,52 @@ const clearPlayerTimeout = (state: PlayerProgress) => {
     clearTimeout(state.timeoutId);
     state.timeoutId = null;
   }
+};
+
+const checkAllPlayersFinished = (game: GameState): boolean => {
+  for (const [, progress] of game.playerProgress) {
+    const outOfLives = progress.lives <= 0;
+    const outOfTime = progress.time <= 0;
+    const outOfQuestions = progress.currentIndex >= game.questions.length;
+
+    if (!outOfLives && !outOfTime && !outOfQuestions) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const handleGameEnd = (io: Server, roomId: string, game: GameState) => {
+  const result = checkWinner(game.playerProgress);
+  io.to(roomId).emit("game:end", result);
+
+  setTimeout(() => {
+    io.to(roomId).emit("game:returnToLobby");
+    games.delete(roomId);
+  }, 10000);
+};
+
+const checkWinner = (playerProgress: Map<string, PlayerProgress>) => {
+  const entries = Array.from(playerProgress.entries());
+
+  if (entries.length === 0) return null;
+
+  let maxScore = -Infinity;
+  for (const [, progress] of entries) {
+    if (progress.score > maxScore) {
+      maxScore = progress.score;
+    }
+  }
+
+  const winners = entries
+    .filter(([, progress]) => progress.score === maxScore)
+    .map(([userId, progress]) => ({ userId, score: progress.score }));
+
+  if (winners.length === 1) {
+    return { tie: false, winner: winners[0] };
+  }
+
+  return { tie: true, winners };
 };
 
 export function confirmAnswer(socket: Socket, io: Server) {
@@ -115,6 +167,10 @@ export function confirmAnswer(socket: Socket, io: Server) {
             score: currentState.score,
             reason: "no lives remaining",
           });
+
+          if (checkAllPlayersFinished(game)) {
+            handleGameEnd(io, roomId, game);
+          }
           return;
         }
 
@@ -124,6 +180,10 @@ export function confirmAnswer(socket: Socket, io: Server) {
             score: currentState.score,
             reason: "no time remaining",
           });
+
+          if (checkAllPlayersFinished(game)) {
+            handleGameEnd(io, roomId, game);
+          }
           return;
         }
 
@@ -135,6 +195,10 @@ export function confirmAnswer(socket: Socket, io: Server) {
             score: currentState.score,
             reason: "all questions answered",
           });
+
+          if (checkAllPlayersFinished(game)) {
+            handleGameEnd(io, roomId, game);
+          }
           return;
         }
 
