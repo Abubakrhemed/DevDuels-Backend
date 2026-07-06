@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { randomUUID } from "node:crypto";
-import { Lobby, Player } from "../types/types.js";
+import { Lobby, LobbyPrivacy, Player } from "../types/types.js";
 import User from "../Models/User.js";
 
 const lobbies = new Map<string, Lobby>();
@@ -28,12 +28,15 @@ export function registerLobbyHandlers(socket: Socket, io: Server) {
 
     players.set(playerid, player);
 
+    const password = randomUUID();
+
     const lobby: Lobby = {
       roomId: roomId,
       players: players,
       privacy: "PRIVATE",
       maxPlayers: max_players,
       minPlayers: min_players,
+      password: password,
     };
 
     lobbies.set(roomId, lobby);
@@ -45,7 +48,7 @@ export function registerLobbyHandlers(socket: Socket, io: Server) {
 }
 
 export function joinLobbyHandlers(socket: Socket, io: Server) {
-  socket.on("lobby:join", async (roomId, playerid, callback) => {
+  socket.on("lobby:join", async (roomId, playerid, password, callback) => {
     const lobby = lobbies.get(roomId);
 
     if (!lobby) {
@@ -55,6 +58,19 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
 
     if (lobby.players.size >= max_players) {
       callback({ status: "error", message: "lobby is full" });
+      return;
+    }
+
+    if (lobby.privacy === "PRIVATE" && lobby.password === undefined) {
+      callback({
+        status: "error",
+        message: "lobby password required for this room",
+      });
+      return;
+    }
+
+    if (lobby.privacy === "PRIVATE" && lobby.password !== password) {
+      callback({ status: "error", message: "incorrect lobby password" });
       return;
     }
 
@@ -82,6 +98,48 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
   });
 }
 
+export function lobbyPrivacyHandler(socket: Socket, io: Server) {
+  socket.on(
+    "lobby:privacyChange",
+    async (roomId, playerid, privacyUpdate: LobbyPrivacy, callback) => {
+      const lobby = lobbies.get(roomId);
+      const player = lobby?.players.get(playerid);
+
+      if (!lobby) {
+        callback({ status: "error", message: "lobby not found" });
+        return;
+      }
+
+      if (!player) {
+        callback({
+          status: "error",
+          message: "player not found try logging out and logging in",
+        });
+        return;
+      }
+
+      if (privacyUpdate !== "PUBLIC" && privacyUpdate !== "PRIVATE") {
+        callback({
+          status: "error",
+          message: "privacy cam be either PUBLIC OR PRIVATE",
+        });
+        return;
+      }
+
+      if (privacyUpdate === "PRIVATE") {
+        lobby.password = randomUUID();
+      }
+
+      if (privacyUpdate === "PUBLIC") {
+        lobby.password = undefined;
+      }
+
+      lobby.privacy = privacyUpdate;
+      callback({ status: "updated", lobby });
+    },
+  );
+}
+
 export function lobbyDisconnectHandler(socket: Socket, io: Server) {
   socket.on("lobby:dissconnect", async (roomID, playerid, callback) => {
     const lobby = lobbies.get(roomID);
@@ -97,8 +155,6 @@ export function lobbyDisconnectHandler(socket: Socket, io: Server) {
       callback({ status: "error", message: "lobby not found" });
       return;
     }
-
-    lobby.players.delete(playerid);
 
     lobby.players.delete(playerid);
 

@@ -15,6 +15,7 @@ export type Lobby = {
   privacy: LobbyPrivacy;
   maxPlayers: number;
   minPlayers: number;
+  password:string | undefined;
 };
 
 export type QuestionSeed = {
