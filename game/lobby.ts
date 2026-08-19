@@ -183,3 +183,21 @@ export const setLobbyInProgress = (roomId: string, state: boolean) => {
     lobby.inProgress = state;
   }
 };
+
+export function getPublicLobbiesHandler(socket: Socket, io: Server) {
+  socket.on("lobby:getPublic", (callback) => {
+    const publicLobbies = Array.from(lobbies.values())
+      .filter(lobby =>
+        lobby.privacy === "PUBLIC" &&
+        !lobby.inProgress &&
+        lobby.players.size < lobby.maxPlayers
+      )
+      .map(lobby => ({
+        roomId: lobby.roomId,
+        playerCount: lobby.players.size,
+        maxPlayers: lobby.maxPlayers,
+      }))
+
+    callback({ status: "ok", lobbies: publicLobbies })
+  })
+}

@@ -5,6 +5,7 @@ import {
   lobbyDisconnectHandler,
   registerLobbyHandlers,
   lobbyPrivacyHandler,
+  getPublicLobbiesHandler,
 } from "../game/lobby.js";
 
 import { confirmAnswer, startGame } from "../game/game.js";
@@ -21,6 +22,7 @@ export function initSocket(server: HttpServer) {
     startGame(socket, io);
     confirmAnswer(socket, io);
     lobbyPrivacyHandler(socket, io);
+    getPublicLobbiesHandler(socket,io)
 
     socket.on("disconnect", () => {
       console.log("user disconnected");
