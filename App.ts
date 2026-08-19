@@ -9,6 +9,9 @@ app.use(cors())
 app.use(express.json())
 app.use("/api",AuthROuter)
 app.use("/api", leaderboardRouter)
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "ok" })
+})
 
 
 export default app
