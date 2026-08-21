@@ -13,7 +13,7 @@ ApiController.get("/lobbies/public", (req, res) => {
       inProgress: lobby.inProgress,
     }));
 
-  res.json({ lobbies: publicLobbies });
+  res.json({ status:"ok",lobbies: publicLobbies });
 });
 
 export default ApiController;
