@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Lobby, LobbyPrivacy, Player } from "../types/types.js";
 import User from "../Models/User.js";
 
-const lobbies = new Map<string, Lobby>();
+export const lobbies = new Map<string, Lobby>();
 const max_players = 4;
 const min_players = 1;
 
