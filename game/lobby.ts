@@ -144,7 +144,7 @@ export function lobbyPrivacyHandler(socket: Socket, io: Server) {
       }
 
       lobby.privacy = privacyUpdate;
-      callback({ status: "updated", lobby });
+      callback({ status: "ok", lobby });
     },
   );
 }
