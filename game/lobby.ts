@@ -7,6 +7,48 @@ export const lobbies = new Map<string, Lobby>();
 const max_players = 4;
 const min_players = 1;
 
+function getPublicLobbySummaries() {
+  return Array.from(lobbies.values())
+    .filter(
+      (lobby) =>
+        lobby.privacy === "PUBLIC" &&
+        !lobby.inProgress &&
+        lobby.players.size < lobby.maxPlayers
+    )
+    .map((lobby) => ({
+      roomId: lobby.roomId,
+      playerCount: lobby.players.size,
+      maxPlayers: lobby.maxPlayers,
+    }));
+}
+
+function broadcastPublicLobbies(io: Server) {
+  io.emit("lobby:publicListChanged", { lobbies: getPublicLobbySummaries() });
+}
+
+async function removePlayerFromLobby(
+  roomId: string,
+  playerid: string,
+  io: Server
+) {
+  const lobby = lobbies.get(roomId);
+  if (!lobby) return;
+
+  const user = await User.findById(playerid).select("-passwordHash");
+  lobby.players.delete(playerid);
+
+  if (lobby.players.size < min_players) {
+    lobbies.delete(roomId);
+    broadcastPublicLobbies(io);
+    return;
+  }
+
+  io.to(roomId).emit("lobby:playerLeft", {
+    username: user?.username ?? "a player",
+  });
+  broadcastPublicLobbies(io);
+}
+
 export function registerLobbyHandlers(socket: Socket, io: Server) {
   socket.on("lobby:create", async (playerid, callback) => {
     const roomId = randomUUID();
@@ -41,6 +83,9 @@ export function registerLobbyHandlers(socket: Socket, io: Server) {
     };
 
     lobbies.set(roomId, lobby);
+
+    socket.data.playerId = playerid;
+    socket.data.roomId = roomId;
 
     socket.join(roomId);
 
@@ -99,9 +144,13 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
 
     lobby.players.set(playerid, player);
 
+    socket.data.playerId = playerid;
+    socket.data.roomId = roomId;
+
     socket.join(roomId);
 
     io.to(roomId).emit("lobby:playerJoined", { player });
+    broadcastPublicLobbies(io);
 
     callback({ status: "ok", lobby });
   });
@@ -144,6 +193,7 @@ export function lobbyPrivacyHandler(socket: Socket, io: Server) {
       }
 
       lobby.privacy = privacyUpdate;
+      broadcastPublicLobbies(io);
       callback({ status: "ok", lobby });
     },
   );
@@ -153,27 +203,24 @@ export function lobbyDisconnectHandler(socket: Socket, io: Server) {
   socket.on("lobby:dissconnect", async (roomID, playerid, callback) => {
     const lobby = lobbies.get(roomID);
 
-    const user = await User.findById(playerid).select("-passwordHash");
-
-    if (!user) {
-      callback({ status: "error", message: "user not found" });
-      return;
-    }
-
     if (!lobby) {
       callback({ status: "error", message: "lobby not found" });
       return;
     }
 
-    lobby.players.delete(playerid);
+    await removePlayerFromLobby(roomID, playerid, io);
+    callback({ status: "ok", message: "lobby left" });
+  });
 
-    if (lobby.players.size < min_players) {
-      lobbies.delete(roomID);
-      callback({ status: "ok", message: "lobby discarded" });
-      return;
+  socket.on("disconnect", async () => {
+    const { playerId, roomId } = socket.data as {
+      playerId?: string;
+      roomId?: string;
+    };
+
+    if (playerId && roomId) {
+      await removePlayerFromLobby(roomId, playerId, io);
     }
-
-    io.to(roomID).emit("lobby:playerLeft", { username: user.username });
   });
 }
 
@@ -186,18 +233,6 @@ export const setLobbyInProgress = (roomId: string, state: boolean) => {
 
 export function getPublicLobbiesHandler(socket: Socket, io: Server) {
   socket.on("lobby:getPublic", (callback) => {
-    const publicLobbies = Array.from(lobbies.values())
-      .filter(lobby =>
-        lobby.privacy === "PUBLIC" &&
-        !lobby.inProgress &&
-        lobby.players.size < lobby.maxPlayers
-      )
-      .map(lobby => ({
-        roomId: lobby.roomId,
-        playerCount: lobby.players.size,
-        maxPlayers: lobby.maxPlayers,
-      }))
-
-    callback({ status: "ok", lobbies: publicLobbies })
-  })
+    callback({ status: "ok", lobbies: getPublicLobbySummaries() });
+  });
 }
