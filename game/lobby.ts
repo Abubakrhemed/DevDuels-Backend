@@ -122,6 +122,11 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
       });
       return;
     }
+    
+    if (lobby.players.has(playerid)) {
+      callback({ status: "error", message: "you are already in this lobby" });
+      return;
+    }
 
     if (lobby.privacy === "PRIVATE" && lobby.password !== password) {
       callback({ status: "error", message: "incorrect lobby password" });
