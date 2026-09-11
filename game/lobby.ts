@@ -26,6 +26,13 @@ function broadcastPublicLobbies(io: Server) {
   io.emit("lobby:publicListChanged", { lobbies: getPublicLobbySummaries() });
 }
 
+function serializeLobby(lobby: Lobby) {
+  return {
+    ...lobby,
+    players: Array.from(lobby.players.entries()),
+  };
+}
+
 async function removePlayerFromLobby(
   roomId: string,
   playerid: string,
@@ -89,7 +96,7 @@ export function registerLobbyHandlers(socket: Socket, io: Server) {
 
     socket.join(roomId);
 
-    callback({ status: "ok", roomId, lobby });
+    callback({ status: "ok", roomId, lobby: serializeLobby(lobby) });
   });
 }
 
@@ -99,6 +106,11 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
 
     if (!lobby) {
       callback({ status: "error", message: "lobby not found" });
+      return;
+    }
+
+    if (lobby.players.has(playerid)) {
+      callback({ status: "error", message: "you are already in this lobby" });
       return;
     }
 
@@ -120,11 +132,6 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
         status: "error",
         message: "lobby password required for this room",
       });
-      return;
-    }
-    
-    if (lobby.players.has(playerid)) {
-      callback({ status: "error", message: "you are already in this lobby" });
       return;
     }
 
@@ -157,7 +164,7 @@ export function joinLobbyHandlers(socket: Socket, io: Server) {
     io.to(roomId).emit("lobby:playerJoined", { player });
     broadcastPublicLobbies(io);
 
-    callback({ status: "ok", lobby });
+    callback({ status: "ok", lobby: serializeLobby(lobby) });
   });
 }
 
@@ -199,7 +206,7 @@ export function lobbyPrivacyHandler(socket: Socket, io: Server) {
 
       lobby.privacy = privacyUpdate;
       broadcastPublicLobbies(io);
-      callback({ status: "ok", lobby });
+      callback({ status: "ok", lobby: serializeLobby(lobby) });
     },
   );
 }
