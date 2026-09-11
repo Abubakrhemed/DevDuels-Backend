@@ -5,6 +5,7 @@ import {
   lobbyDisconnectHandler,
   registerLobbyHandlers,
   lobbyPrivacyHandler,
+  getCurrentLobbyHandler,
   getPublicLobbiesHandler,
 } from "../game/lobby.js";
 
@@ -22,6 +23,7 @@ export function initSocket(server: HttpServer) {
     startGame(socket, io);
     confirmAnswer(socket, io);
     lobbyPrivacyHandler(socket, io);
+    getCurrentLobbyHandler(socket, io);
     getPublicLobbiesHandler(socket,io)
 
     socket.on("disconnect", () => {

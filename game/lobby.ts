@@ -248,3 +248,16 @@ export function getPublicLobbiesHandler(socket: Socket, io: Server) {
     callback({ status: "ok", lobbies: getPublicLobbySummaries() });
   });
 }
+
+export function getCurrentLobbyHandler(socket: Socket, io: Server) {
+  socket.on("lobby:getCurrent", (roomId: string, callback) => {
+    const lobby = lobbies.get(roomId);
+
+    if (!lobby) {
+      callback({ status: "error", message: "lobby not found" });
+      return;
+    }
+
+    callback({ status: "ok", lobby: serializeLobby(lobby) });
+  });
+}
