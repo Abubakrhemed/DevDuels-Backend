@@ -22,6 +22,7 @@ export function initSocket(server: HttpServer) {
     lobbyDisconnectHandler(socket, io);
     startGame(socket, io);
     confirmAnswer(socket, io);
+    beginGame(socket,io)
     lobbyPrivacyHandler(socket, io);
     getCurrentLobbyHandler(socket, io);
     getPublicLobbiesHandler(socket,io)
