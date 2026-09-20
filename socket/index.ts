@@ -9,7 +9,7 @@ import {
   getPublicLobbiesHandler,
 } from "../game/lobby.js";
 
-import { confirmAnswer, startGame } from "../game/game.js";
+import { confirmAnswer, startGame,beginGame } from "../game/game.js";
 
 export function initSocket(server: HttpServer) {
   const io = new Server(server, {
