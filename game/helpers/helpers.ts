@@ -10,9 +10,11 @@ const randomizeQuestions = (questions: Array<QuestionSeed>) => {
   return questions;
 };
 
-export const getQuestions = async () => {
+export const getQuestions = async (): Promise<QuestionSeed[]> => {
   try {
-    const questions = await Question.find({});
+    const questions = await Question.find({})
+      .select("+correctAnswer")
+      .lean<QuestionSeed[]>();
     return randomizeQuestions(questions);
   } catch (err) {
     console.log(err);
