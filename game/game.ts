@@ -9,8 +9,16 @@ import { setLobbyInProgress } from "./lobby.js";
 
 const games = new Map<string, GameState>();
 
+export function beginGame(socket: Socket, io: Server) {
+  socket.on("game:begin", (roomId, callback) => {
+    setLobbyInProgress(roomId, true);
+    io.to(roomId).emit("game:started");
+    callback({ status: "ok" });
+  });
+}
+
 export function startGame(socket: Socket, io: Server) {
-  socket.on("game:start", async (roomId, playerid, callback) => {
+  socket.on("game:start", async (roomId, playerid) => {
     try {
       const user = await findUser(playerid);
 
@@ -19,21 +27,37 @@ export function startGame(socket: Socket, io: Server) {
         return;
       }
 
-      if (games.has(roomId)) {
-        callback({ status: "error", message: "game already in progress" });
+      let game = games.get(roomId);
+
+      if (!game) {
+        const questions = await getQuestions();
+        game = {
+          roomId,
+          questions,
+          playerProgress: new Map(),
+        };
+        games.set(roomId, game);
+        setLobbyInProgress(roomId, true);
+      }
+
+      const activeGame = game;
+
+      if (activeGame.playerProgress.has(playerid)) {
+        const existing = activeGame.playerProgress.get(playerid)!;
+        const current = activeGame.questions[existing.currentIndex];
+        if (current) {
+          const { correctAnswer, ...safeQuestion } = current;
+          socket.emit("game:questionSent", safeQuestion, {
+            score: existing.score,
+            lives: existing.lives,
+            currentIndex: existing.currentIndex,
+            time: existing.time,
+          });
+        }
         return;
       }
 
-      const questions = await getQuestions();
-      games.set(roomId, {
-        roomId,
-        questions,
-        playerProgress: new Map(),
-      });
-
-      const game = games.get(roomId)!;
-
-      game.playerProgress.set(playerid, {
+      activeGame.playerProgress.set(playerid, {
         currentIndex: 0,
         score: 0,
         lives: 3,
@@ -41,9 +65,7 @@ export function startGame(socket: Socket, io: Server) {
         timeoutId: null,
       });
 
-      setLobbyInProgress(roomId, true);
-
-      const progress = game.playerProgress.get(playerid)!;
+      const progress = activeGame.playerProgress.get(playerid)!;
 
       const timeoutId = setTimeout(() => {
         socket.emit("game:over", {
@@ -53,14 +75,14 @@ export function startGame(socket: Socket, io: Server) {
 
         progress.time = 0;
 
-        if (checkAllPlayersFinished(game)) {
-          handleGameEnd(io, roomId, game);
+        if (checkAllPlayersFinished(activeGame)) {
+          handleGameEnd(io, roomId, activeGame);
         }
       }, 30000);
 
       progress.timeoutId = timeoutId;
 
-      const fullQuestion = game.questions[progress.currentIndex]!;
+      const fullQuestion = activeGame.questions[progress.currentIndex]!;
       const { correctAnswer, ...safeQuestion } = fullQuestion;
 
       socket.emit("game:questionSent", safeQuestion);
