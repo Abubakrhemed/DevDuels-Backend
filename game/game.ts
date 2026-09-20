@@ -9,6 +9,21 @@ import { setLobbyInProgress } from "./lobby.js";
 
 const games = new Map<string, GameState>();
 
+function broadcastPlayerProgress(
+  io: Server,
+  roomId: string,
+  userId: string,
+  username: string,
+  progress: PlayerProgress
+) {
+  io.to(roomId).emit("game:opponentUpdate", {
+    userId,
+    username,
+    score: progress.score,
+    lives: Math.max(0, progress.lives),
+  });
+}
+
 export function beginGame(socket: Socket, io: Server) {
   socket.on("game:begin", (roomId, callback) => {
     setLobbyInProgress(roomId, true);
@@ -42,6 +57,10 @@ export function startGame(socket: Socket, io: Server) {
 
       const activeGame = game;
 
+      socket.data.playerId = playerid;
+      socket.data.roomId = roomId;
+      socket.join(roomId);
+
       if (activeGame.playerProgress.has(playerid)) {
         const existing = activeGame.playerProgress.get(playerid)!;
         const current = activeGame.questions[existing.currentIndex];
@@ -74,6 +93,7 @@ export function startGame(socket: Socket, io: Server) {
         });
 
         progress.time = 0;
+        broadcastPlayerProgress(io, roomId, playerid, user.username, progress);
 
         if (checkAllPlayersFinished(activeGame)) {
           handleGameEnd(io, roomId, activeGame);
@@ -86,9 +106,43 @@ export function startGame(socket: Socket, io: Server) {
       const { correctAnswer, ...safeQuestion } = fullQuestion;
 
       socket.emit("game:questionSent", safeQuestion);
+      broadcastPlayerProgress(io, roomId, playerid, user.username, progress);
     } catch (err) {
       console.log(err);
       socket.emit("game:error", "server ran into an error");
+    }
+  });
+
+  socket.on("disconnect", async () => {
+    const { playerId, roomId } = socket.data as {
+      playerId?: string;
+      roomId?: string;
+    };
+
+    if (!playerId || !roomId) return;
+
+    const game = games.get(roomId);
+    if (!game) return;
+
+    const progress = game.playerProgress.get(playerId);
+    if (!progress || progress.lives <= 0) return;
+
+    clearPlayerTimeout(progress);
+    progress.lives = 0;
+    progress.time = 0;
+
+    let username = "a player";
+    try {
+      const user = await findUser(playerId);
+      username = user.username;
+    } catch {
+      username = "a player";
+    }
+
+    broadcastPlayerProgress(io, roomId, playerId, username, progress);
+
+    if (checkAllPlayersFinished(game)) {
+      handleGameEnd(io, roomId, game);
     }
   });
 }
@@ -199,6 +253,14 @@ export function confirmAnswer(socket: Socket, io: Server) {
         currentState.lives += livesChange;
         currentState.currentIndex += 1;
         currentState.time += timeChange;
+
+        broadcastPlayerProgress(
+          io,
+          roomId,
+          playerid,
+          user.username,
+          currentState
+        );
 
         if (currentState.lives <= 0) {
           clearPlayerTimeout(currentState);
