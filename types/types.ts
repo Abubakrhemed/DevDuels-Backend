@@ -41,6 +41,7 @@ export type PlayerProgress = {
   currentIndex: number;
   score: number;
   lives: number;
+  deadline: number;
   time: number;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };

@@ -87,26 +87,13 @@ export function startGame(socket: Socket, io: Server) {
         score: 0,
         lives: 3,
         time: 30000,
+        deadline: Date.now() + 30000,
         timeoutId: null,
       });
 
       const progress = game.playerProgress.get(playerid)!;
 
-      const timeoutId = setTimeout(() => {
-        socket.emit("game:over", {
-          score: progress.score,
-          reason: "no time remaining",
-        });
-
-        progress.time = 0;
-        broadcastPlayerProgress(io, roomId, playerid, user.username, progress);
-
-        if (checkAllPlayersFinished(game)) {
-          handleGameEnd(io, roomId, game);
-        }
-      }, 30000);
-
-      progress.timeoutId = timeoutId;
+      armTimeout(io, socket, roomId, playerid, user.username, game, progress);
 
       const fullQuestion = game.questions[progress.currentIndex]!;
       const { correctAnswer, ...safeQuestion } = fullQuestion;
@@ -159,6 +146,30 @@ const clearPlayerTimeout = (state: PlayerProgress) => {
     state.timeoutId = null;
   }
 };
+
+function armTimeout(
+  io: Server,
+  socket: Socket,
+  roomId: string,
+  playerId: string,
+  username: string,
+  game: GameState,
+  progress: PlayerProgress
+) {
+  clearPlayerTimeout(progress);
+  const remaining = Math.max(0, progress.deadline - Date.now());
+  progress.timeoutId = setTimeout(() => {
+    socket.emit("game:over", {
+      score: progress.score,
+      reason: "no time remaining",
+    });
+    progress.time = 0;
+    broadcastPlayerProgress(io, roomId, playerId, username, progress);
+    if (checkAllPlayersFinished(game)) {
+      handleGameEnd(io, roomId, game);
+    }
+  }, remaining);
+}
 
 const checkAllPlayersFinished = (game: GameState): boolean => {
   if (game.playerProgress.size === 0) return false;
@@ -255,12 +266,18 @@ export function confirmAnswer(socket: Socket, io: Server) {
         const answerCheck = checkAnswer(answer, roomId, playerid);
         const pointsChange = calculatePoints(answerCheck, currentQuestion);
         const livesChange = calculateLives(answerCheck, currentQuestion);
-        const timeChange = calculateTime(answerCheck, currentQuestion);
 
-        currentState.score += pointsChange;
+        const remaining = Math.max(0, currentState.deadline - Date.now());
+        const timeDelta =
+          (answerCheck.answeredCorrect
+            ? currentQuestion.timeAwarded
+            : -currentQuestion.timeSubtracted) * 1000;
+        const newRemaining = remaining + timeDelta;
+
+        currentState.score = Math.max(0, currentState.score + pointsChange);
         currentState.lives += livesChange;
         currentState.currentIndex += 1;
-        currentState.time += timeChange;
+        currentState.time = Math.max(0, newRemaining);
 
         broadcastPlayerProgress(
           io,
@@ -283,7 +300,7 @@ export function confirmAnswer(socket: Socket, io: Server) {
           return;
         }
 
-        if (currentState.time <= 0) {
+        if (newRemaining <= 0) {
           clearPlayerTimeout(currentState);
           socket.emit("game:over", {
             score: currentState.score,
@@ -310,6 +327,9 @@ export function confirmAnswer(socket: Socket, io: Server) {
           }
           return;
         }
+        
+        currentState.deadline = Date.now() + newRemaining;
+        armTimeout(io, socket, roomId, playerid, user.username, game, currentState);
 
         const { correctAnswer, ...safeQ } = nextQuestion;
 
@@ -356,14 +376,4 @@ const calculateLives = (
     return 0;
   }
   return -currentQuestion.livesSubtracted;
-};
-
-const calculateTime = (
-  object: { answeredCorrect: boolean },
-  currentQuestion: QuestionSeed,
-): number => {
-  if (object.answeredCorrect) {
-    return currentQuestion.timeAwarded;
-  }
-  return -currentQuestion.timeSubtracted;
 };
