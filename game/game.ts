@@ -20,6 +20,7 @@ function broadcastPlayerProgress(
     userId,
     username,
     score: progress.score,
+    streak:progress.streak,
     lives: Math.max(0, progress.lives),
   });
 }
@@ -101,7 +102,7 @@ export function startGame(socket: Socket, io: Server) {
       const { correctAnswer, ...safeQuestion } = fullQuestion;
 
       socket.emit("game:questionSent", safeQuestion);
-      broadcastPlayerProgress(io, roomId, playerid, user.username, progress);
+      broadcastPlayerProgress(io, roomId, playerid, user.username, progress,);
     } catch (err) {
       console.log(err);
       socket.emit("game:error", "server ran into an error");
