@@ -14,7 +14,7 @@ function broadcastPlayerProgress(
   roomId: string,
   userId: string,
   username: string,
-  progress: PlayerProgress
+  progress: PlayerProgress,
 ) {
   io.to(roomId).emit("game:opponentUpdate", {
     userId,
@@ -75,6 +75,7 @@ export function startGame(socket: Socket, io: Server) {
           socket.emit("game:questionSent", safeQuestion, {
             score: existing.score,
             lives: existing.lives,
+            streak: existing.streak,
             currentIndex: existing.currentIndex,
             time: existing.time,
           });
@@ -86,6 +87,7 @@ export function startGame(socket: Socket, io: Server) {
         currentIndex: 0,
         score: 0,
         lives: 3,
+        streak: 0,
         time: 30000,
         deadline: Date.now() + 30000,
         timeoutId: null,
@@ -154,7 +156,7 @@ function armTimeout(
   playerId: string,
   username: string,
   game: GameState,
-  progress: PlayerProgress
+  progress: PlayerProgress,
 ) {
   clearPlayerTimeout(progress);
   const remaining = Math.max(0, progress.deadline - Date.now());
@@ -262,14 +264,25 @@ export function confirmAnswer(socket: Socket, io: Server) {
         }
 
         const currentQuestion = game.questions[currentState.currentIndex]!;
+        const answeredCorrect = answer === currentQuestion.correctAnswer;
+        const onStreak = answeredCorrect && currentState.streak >= 3;
+        
+        const pointsChange = calculatePoints(
+          answeredCorrect,
+          currentQuestion,
+          onStreak,
+        );
+        const livesChange = calculateLives(answeredCorrect, currentQuestion);
 
-        const answerCheck = checkAnswer(answer, roomId, playerid);
-        const pointsChange = calculatePoints(answerCheck, currentQuestion);
-        const livesChange = calculateLives(answerCheck, currentQuestion);
+        if (answeredCorrect) {
+          if (currentState.streak < 3) currentState.streak++;
+        } else {
+          currentState.streak = 0;
+        }
 
         const remaining = Math.max(0, currentState.deadline - Date.now());
         const timeDelta =
-          (answerCheck.answeredCorrect
+          (answeredCorrect 
             ? currentQuestion.timeAwarded
             : -currentQuestion.timeSubtracted) * 1000;
         const newRemaining = remaining + timeDelta;
@@ -284,7 +297,7 @@ export function confirmAnswer(socket: Socket, io: Server) {
           roomId,
           playerid,
           user.username,
-          currentState
+          currentState,
         );
 
         if (currentState.lives <= 0) {
@@ -327,15 +340,24 @@ export function confirmAnswer(socket: Socket, io: Server) {
           }
           return;
         }
-        
+
         currentState.deadline = Date.now() + newRemaining;
-        armTimeout(io, socket, roomId, playerid, user.username, game, currentState);
+        armTimeout(
+          io,
+          socket,
+          roomId,
+          playerid,
+          user.username,
+          game,
+          currentState,
+        );
 
         const { correctAnswer, ...safeQ } = nextQuestion;
 
         socket.emit("game:questionSent", safeQ, {
           score: currentState.score,
           lives: currentState.lives,
+          streak: currentState.streak,
           currentIndex: currentState.currentIndex,
           time: currentState.time,
         });
@@ -347,32 +369,24 @@ export function confirmAnswer(socket: Socket, io: Server) {
   );
 }
 
-const checkAnswer = (answer: string, roomId: string, playerid: string) => {
-  const game = games.get(roomId)!;
-  const progress = game.playerProgress.get(playerid)!;
-  const currentQuestion = game.questions[progress.currentIndex]!;
-
-  return {
-    answeredCorrect: answer === currentQuestion.correctAnswer,
-    format: currentQuestion.format,
-  };
-};
-
 const calculatePoints = (
-  object: { answeredCorrect: boolean },
+  answeredCorrect: boolean,
   currentQuestion: QuestionSeed,
+  onStreak: boolean,
 ): number => {
-  if (object.answeredCorrect) {
-    return currentQuestion.pointsAwarded;
+  if (answeredCorrect) {
+    return onStreak
+      ? currentQuestion.pointsAwarded * 2
+      : currentQuestion.pointsAwarded;
   }
   return -currentQuestion.pointsSubtracted;
 };
 
 const calculateLives = (
-  object: { answeredCorrect: boolean },
+  answeredCorrect: boolean ,
   currentQuestion: QuestionSeed,
 ): number => {
-  if (object.answeredCorrect) {
+  if (answeredCorrect) {
     return 0;
   }
   return -currentQuestion.livesSubtracted;
