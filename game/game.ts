@@ -5,7 +5,7 @@ import {
   updateLeaderboardScores,
 } from "./helpers/helpers.js";
 import { GameState, PlayerProgress, QuestionSeed } from "../types/types.js";
-import { setLobbyInProgress } from "./lobby.js";
+import { setLobbyInProgress ,lobbies} from "./lobby.js";
 
 const games = new Map<string, GameState>();
 
@@ -28,6 +28,18 @@ function broadcastPlayerProgress(
 export function beginGame(socket: Socket, io: Server) {
   socket.on("game:begin", async (roomId, callback) => {
     try {
+      const lobby = lobbies.get(roomId);
+
+      if (!lobby) {
+        callback({ status: "error", message: "lobby not found" });
+        return;
+      }
+
+      if (lobby.players.size < 2) {
+        callback({ status: "error", message: "need at least 2 players to start" });
+        return;
+      }
+
       if (!games.has(roomId)) {
         const questions = await getQuestions();
         games.set(roomId, {
@@ -89,8 +101,8 @@ export function startGame(socket: Socket, io: Server) {
         score: 0,
         lives: 3,
         streak: 0,
-        time: 30000,
-        deadline: Date.now() + 30000,
+        time: 60000,
+        deadline: Date.now() + 60000,
         timeoutId: null,
       });
 
