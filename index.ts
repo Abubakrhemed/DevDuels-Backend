@@ -13,7 +13,8 @@ try {
     if (response) {
         initSocket(server)
         server.listen(PORT, () => {
-            console.log("server running on ", PORT);
+          console.log("server running on ", PORT);
+          console.log("MONGODB_CONNECTED")
         });
     }
 

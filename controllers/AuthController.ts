@@ -6,7 +6,7 @@ import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 import { JWT_SECRET, GMAIL_USER, GMAIL_APP_PASSWORD } from "../config/env.js";
 import express from "express";
 
-import { Accountlimiter, resetPasswordlimiter, LoginLimiter } from "../App.js";
+import { Accountlimiter, resetPasswordlimiter, LoginLimiter } from "../middleware/limiters.js";
 
 const AuthRouter = express.Router();
 
@@ -188,17 +188,54 @@ AuthRouter.post(
         { expiresIn: "15m" },
       );
 
-      const resetLink = `http://localhost:5172/reset-password?token=${token}`;
+      const resetLink = `http://localhost:5382/reset-password?token=${token}`;
 
       await transporter.sendMail({
-        from: GMAIL_USER,
+        from: '"DevDuels" <abubuilds.noreply@gmail.com>',
         to: email,
-        subject: "DevDuels Password Reset Request",
+        subject: "Reset your DevDuels password",
         html: `
-          <h1>Password Reset</h1>
-          <p>If you did not request a password reset you can ignore this email.</p>
-          <p>This link expires in 15 minutes.</p>
-          <a href="${resetLink}">Reset your password</a>
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"></head>
+          <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+              <tr>
+                <td align="center">
+                  <table width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;padding:40px;">
+                    <tr>
+                      <td style="text-align:center;padding-bottom:24px;">
+                        <span style="font-size:24px;font-weight:bold;color:#111;">dev<span style="color:#6366f1;">duels</span></span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:16px;color:#333;line-height:1.6;padding-bottom:16px;">
+                        We received a request to reset your password. Click the button below to choose a new one.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td align="center" style="padding:24px 0;">
+                        <a href="${resetLink}" style="background-color:#6366f1;color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:6px;font-size:16px;font-weight:bold;display:inline-block;">
+                          Reset Password
+                        </a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:14px;color:#666;line-height:1.5;padding-bottom:8px;">
+                        This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="border-top:1px solid #e4e4e7;padding-top:16px;font-size:12px;color:#999;text-align:center;">
+                        DevDuels — real-time developer duels
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `,
       });
 
