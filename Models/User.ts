@@ -1,13 +1,18 @@
 import mongoose, { Schema } from "mongoose";
 
 const userSchema = new Schema({
-     username: { type: String, required: true, unique: true },
-     passwordHash: { type: String, required: true, select: false },
-     Points: { type: Number, default: 0 },
-     status: { type: String, enum: ["OFFLINE", "IN_LOBBY", "IN_GAME", "ONLINE"], default: "OFFLINE" },
-     leaderboardPts: { type: Number, default: 0 },
-})
+  username: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true, select: false },
+  Points: { type: Number, default: 0 },
+  status: {
+    type: String,
+    enum: ["OFFLINE", "IN_LOBBY", "IN_GAME", "ONLINE"],
+    default: "OFFLINE",
+  },
+  email: { type: String, required: true, select: false },
+  leaderboardPts: { type: Number, default: 0 },
+});
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 
-export default User
+export default User;
