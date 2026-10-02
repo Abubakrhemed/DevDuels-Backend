@@ -6,7 +6,11 @@ import { requireAuth, AuthedRequest } from "../middleware/auth.js";
 import { JWT_SECRET, GMAIL_USER, GMAIL_APP_PASSWORD } from "../config/env.js";
 import express from "express";
 
-import { Accountlimiter, resetPasswordlimiter, LoginLimiter } from "../middleware/limiters.js";
+import {
+  Accountlimiter,
+  resetPasswordlimiter,
+  LoginLimiter,
+} from "../middleware/limiters.js";
 
 const AuthRouter = express.Router();
 
@@ -18,20 +22,52 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (local.length <= 1) return `${local}**@${domain}`;
+  return `${local[0]}${"*".repeat(local.length - 1)}@${domain}`;
+}
+
 AuthRouter.get("/user/:id", requireAuth, async (req: AuthedRequest, res) => {
   try {
     const id = req.params.id;
-    const response = await User.findById(id);
+    const response = await User.findById(id).select("+email");
 
     if (!response) {
       res.status(404).json({ err: "no user found" });
       return;
     }
 
-    const { passwordHash: _, ...safeUser } = response.toObject();
+    const userObj = response.toObject();
+    userObj.email = maskEmail(response.email);
+    const { passwordHash: _, ...safeUser } = userObj;
     res.status(200).json({ user: safeUser });
+    
   } catch (err) {
     res.status(500).json({ err: "server err occured" });
+    console.log(err);
+  }
+});
+
+AuthRouter.delete("/user/:id", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const id = req.params.id;
+
+    if (req.userId !== id) {
+      res.status(403).json({ err: "you can only delete your own account" });
+      return;
+    }
+
+    const user = await User.findByIdAndDelete(id);
+
+    if (!user) {
+      res.status(404).json({ err: "user not found" });
+      return;
+    }
+
+    res.status(200).json({ message: "account deleted" });
+  } catch (err) {
+    res.status(500).json({ err: "server error occurred" });
     console.log(err);
   }
 });
@@ -291,7 +327,9 @@ AuthRouter.put("/user/passwordReset", async (req, res) => {
     res.status(200).json({ message: "password updated successfully" });
   } catch (err: any) {
     if (err.name === "TokenExpiredError") {
-      res.status(400).json({ err: "reset link has expired, request a new one" });
+      res
+        .status(400)
+        .json({ err: "reset link has expired, request a new one" });
       return;
     }
 
