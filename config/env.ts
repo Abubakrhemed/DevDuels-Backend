@@ -12,7 +12,6 @@ function requireEnv(name: string): string {
 export const JWT_SECRET = requireEnv("JWT_SECRET");
 export const MONGODB_URI = requireEnv("MONGODB_URI");
 export const PORT = process.env.PORT || "3000";
-export const RESEND_API = requireEnv("RESEND_API");
 export const GMAIL_USER = requireEnv("GMAIL_USER");
 export const GMAIL_APP_PASSWORD = requireEnv("GMAIL_APP_PASSWORD");
 export const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5382"
