@@ -24,6 +24,7 @@ const transporter = nodemailer.createTransport({
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
+  if (!local || !domain) return "***";
   if (local.length <= 1) return `${local}**@${domain}`;
   return `${local[0]}${"*".repeat(local.length - 1)}@${domain}`;
 }
