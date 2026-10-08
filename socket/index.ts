@@ -10,10 +10,11 @@ import {
 } from "../game/lobby.js";
 
 import { confirmAnswer, startGame,beginGame } from "../game/game.js";
+import { CLIENT_ORIGIN } from "../config/env.js";
 
 export function initSocket(server: HttpServer) {
   const io = new Server(server, {
-    cors: { origin: "http://localhost:5382" },
+    cors: { origin: CLIENT_ORIGIN },
   });
 
   io.on("connection", (socket) => {
